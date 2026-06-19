@@ -47,10 +47,7 @@ def api_chat():
     except Exception as e:
         return jsonify({"error": f"Unexpected error: {e}"}), 500
 
-    return jsonify({
-        "reply": reply,
-        "history": chat_history,
-    })
+    return jsonify({"reply": reply})
 
 
 @app.route("/api/history", methods=["GET"])

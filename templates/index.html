@@ -503,17 +503,26 @@
       sendMessage();
     }
 
-    // ── Show error ──
-    function showError(msg) {
+    // ── Show toast notification ──
+    function showToast(msg, type = 'error') {
       errorToast.textContent = msg;
+      errorToast.style.background = type === 'success' ? '#16a34a' : '#dc2626';
       errorToast.classList.add('show');
       setTimeout(() => errorToast.classList.remove('show'), 5000);
     }
+    // Alias for backward compatibility
+    const showError = showToast;
 
-    // ── Simple markdown-ish rendering ──
+    // ── Simple markdown-ish rendering (safe against XSS) ──
     function renderMarkdown(text) {
       if (!text) return '';
+      // First escape HTML to prevent XSS
       let html = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      // Then apply markdown transformations
+      html = html
         // Code blocks
         .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
         // Inline code
@@ -603,8 +612,9 @@
       const text = messageInput.value.trim();
       if (!text || isLoading) return;
 
-      // Hide welcome
-      if (welcome) welcome.style.display = 'none';
+      // Hide welcome (re-query in case DOM was rebuilt after clear)
+      const welcomeEl = document.getElementById('welcome');
+      if (welcomeEl) welcomeEl.style.display = 'none';
 
       // Add user message
       const userMsg = createMessageElement('user', text);
@@ -685,12 +695,12 @@
         const res = await fetch('/api/health');
         const data = await res.json();
         if (data.index_ready) {
-          showError('System healthy. Vector index is loaded and ready.');
+          showToast('System healthy. Vector index is loaded and ready.', 'success');
         } else {
-          showError('Warning: Vector index not found. Run `python ingest.py` first.');
+          showToast('Warning: Vector index not found. Run `python ingest.py` first.');
         }
       } catch (e) {
-        showError('Cannot reach the server.');
+        showToast('Cannot reach the server.');
       }
     }
 
