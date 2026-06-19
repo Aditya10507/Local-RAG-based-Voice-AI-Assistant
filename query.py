@@ -1,11 +1,12 @@
 from pathlib import Path
 import json
 import os
-import subprocess
 
 import faiss
 import numpy as np
-from sentence_transformers import SentenceTransformer
+import requests
+from sentence_transformers import SentenceTransformer, CrossEncoder
+from rank_bm25 import BM25Okapi
 
 # In-memory conversation history. Each item is a dict: {"user": str, "assistant": str}
 # This is kept in memory only (no persistence) and will be included in prompts
@@ -15,24 +16,115 @@ chat_history = []
 # Module-level cache for loaded resources to avoid reloading on every call
 _GLOBAL = {
     "index": None,
-    "chunks": None,
+    "chunks": None,  # list of dicts: {"text": str, "metadata": dict}
     "st_model": None,
+    "bm25": None,  # BM25Okapi instance
+    "cross_encoder": None,
 }
+
+# RRF (Reciprocal Rank Fusion) constant
+_RRF_K = 60
+
+# Number of results at each pipeline stage
+_DENSE_TOP_K = 20
+_SPARSE_TOP_K = 20
+_RRF_TOP_K = 15
+
+
+def _tokenize(text: str) -> list[str]:
+    """Simple whitespace + lowercase tokenizer for BM25."""
+    return text.lower().split()
 
 
 def _ensure_loaded(db_dir: str = "db"):
-    """Lazy-load FAISS index, chunks, and sentence-transformers model into module cache."""
+    """Lazy-load FAISS index, chunks, BM25 index, and cross-encoder model."""
     db_path = Path(db_dir)
     index_file = db_path / "index.faiss"
     chunks_file = db_path / "chunks.json"
+
+    # --- Load FAISS + chunks ---
     if _GLOBAL["index"] is None:
         if not index_file.exists() or not chunks_file.exists():
-            raise FileNotFoundError(f"FAISS DB not found in {db_dir}. Run `ingest.py` first.")
+            raise FileNotFoundError(
+                f"FAISS DB not found in {db_dir}. Run `python ingest.py` first."
+            )
         _GLOBAL["index"] = faiss.read_index(str(index_file))
         with open(chunks_file, "r", encoding="utf-8") as f:
-            _GLOBAL["chunks"] = json.load(f)
+            raw_chunks = json.load(f)
+
+        # Handle backwards compatibility: old format was list[str]
+        if raw_chunks and isinstance(raw_chunks[0], str):
+            _GLOBAL["chunks"] = [
+                {"text": c, "metadata": {"source": "unknown"}}
+                for i, c in enumerate(raw_chunks)
+            ]
+        else:
+            _GLOBAL["chunks"] = raw_chunks
+
+    # --- Load sentence-transformer model ---
     if _GLOBAL["st_model"] is None:
         _GLOBAL["st_model"] = SentenceTransformer("all-MiniLM-L6-v2")
+
+    # --- Build BM25 index ---
+    if _GLOBAL["bm25"] is None:
+        tokenized_corpus = [_tokenize(c["text"]) for c in _GLOBAL["chunks"]]
+        _GLOBAL["bm25"] = BM25Okapi(tokenized_corpus)
+
+    # --- Load cross-encoder for re-ranking ---
+    if _GLOBAL["cross_encoder"] is None:
+        _GLOBAL["cross_encoder"] = CrossEncoder(
+            "cross-encoder/ms-marco-MiniLM-L-6-v2"
+        )
+
+
+def _search_hybrid(query: str) -> list[int]:
+    """Hybrid search combining dense (FAISS) and sparse (BM25) retrieval with RRF.
+
+    Returns a list of chunk indices sorted by combined relevance.
+    """
+    # --- Dense search via FAISS ---
+    q_vec = _GLOBAL["st_model"].encode(
+        [query], convert_to_numpy=True
+    ).astype("float32")
+    dense_distances, dense_indices = _GLOBAL["index"].search(q_vec, _DENSE_TOP_K)
+
+    # --- Sparse search via BM25 ---
+    tokenized_query = _tokenize(query)
+    bm25_scores = _GLOBAL["bm25"].get_scores(tokenized_query)
+    sparse_top_indices = np.argsort(bm25_scores)[::-1][:_SPARSE_TOP_K]
+
+    # --- RRF: combine rankings ---
+    rrf_scores: dict[int, float] = {}
+
+    for rank, idx in enumerate(dense_indices[0].tolist()):
+        rrf_scores[idx] = rrf_scores.get(idx, 0) + 1.0 / (_RRF_K + rank + 1)
+
+    for rank, idx in enumerate(sparse_top_indices.tolist()):
+        rrf_scores[idx] = rrf_scores.get(idx, 0) + 1.0 / (_RRF_K + rank + 1)
+
+    # Sort by combined RRF score descending
+    ranked = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
+    return [idx for idx, _score in ranked[:_RRF_TOP_K]]
+
+
+def _rerank(query: str, indices: list[int]) -> list[int]:
+    """Re-rank retrieved chunks using a cross-encoder model.
+
+    The cross-encoder scores each (query, chunk) pair more accurately than
+    the bi-encoder (sentence-transformer) used for initial retrieval.
+    """
+    if not indices:
+        return []
+
+    chunks = _GLOBAL["chunks"]
+    pairs = [(query, chunks[i]["text"]) for i in indices]
+
+    # Cross-encoder returns a relevance score per pair
+    scores = _GLOBAL["cross_encoder"].predict(pairs, show_progress_bar=False)
+
+    scored = list(zip(indices, scores))
+    scored.sort(key=lambda x: x[1], reverse=True)
+    return [idx for idx, _score in scored]
 
 
 def _build_prompt(user_query: str, context: str) -> str:
@@ -81,74 +173,104 @@ def _generate_with_groq(prompt: str) -> str:
 
 
 def _generate_with_ollama(prompt: str) -> str:
-    """Generate a response using local Ollama (fallback for development)."""
+    """Generate a response using local Ollama via its HTTP API.
+
+    The Ollama model can be configured via the OLLAMA_MODEL environment variable.
+    Defaults to 'mistral'.
+    """
+    model = os.environ.get("OLLAMA_MODEL", "mistral")
     try:
-        proc = subprocess.run(
-            ["ollama", "run", "mistral", "--prompt", prompt],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
+        resp = requests.post(
+            "http://localhost:11434/api/generate",
+            json={"model": model, "prompt": prompt, "stream": False},
+            timeout=120,
         )
-        if proc.returncode == 0:
-            return proc.stdout.strip()
-        else:
-            return f"Ollama Error: {proc.stderr}"
-    except FileNotFoundError:
+        resp.raise_for_status()
+        return resp.json()["response"].strip()
+    except requests.exceptions.ConnectionError:
         raise RuntimeError(
-            "Ollama not found and no GROQ_API_KEY set. "
-            "Either install Ollama locally or set the GROQ_API_KEY environment variable "
-            "to use the Groq cloud API."
+            f"Cannot connect to Ollama at http://localhost:11434. "
+            f"Make sure Ollama is running and '{model}' model is pulled. "
+            "Alternatively, set the GROQ_API_KEY environment variable to use the Groq cloud API."
         )
 
 
-def get_response(user_query: str, db_dir: str = "db", k: int = 3) -> str:
-    """Answer a question by retrieving from FAISS and generating via Groq or Ollama.
+def get_response(user_query: str, db_dir: str = "db", k: int = 5) -> str:
+    """Answer a question using the full RAG pipeline: hybrid search → re-rank → generate.
 
-    Uses Groq API if GROQ_API_KEY env var is set, otherwise falls back to local Ollama.
-    Returns the assistant's answer as a string and also appends the interaction
+    Pipeline:
+    1. Hybrid retrieval (FAISS dense + BM25 sparse) with RRF fusion
+    2. Cross-encoder re-ranking of top results
+    3. Context assembly with source metadata
+    4. LLM generation via Ollama (local) or Groq (cloud)
+
+    Returns the assistant's answer as a string and appends the interaction
     to the in-memory `chat_history`.
     """
     _ensure_loaded(db_dir)
 
-    index = _GLOBAL["index"]
     chunks = _GLOBAL["chunks"]
-    st_model = _GLOBAL["st_model"]
 
-    # Embed the question
-    q_vec = st_model.encode([user_query], convert_to_numpy=True).astype("float32")
+    # Step 1: Hybrid search (FAISS + BM25 with RRF)
+    hybrid_indices = _search_hybrid(user_query)
 
-    # Search FAISS
-    D, I = index.search(q_vec, k)
-    top_idxs = I[0].tolist()
-    retrieved = [chunks[i] for i in top_idxs]
-    context = "\n\n".join(retrieved)
+    # Step 2: Cross-encoder re-ranking
+    reranked_indices = _rerank(user_query, hybrid_indices)
 
+    # Step 3: Take top-k results
+    top_indices = reranked_indices[:k]
+
+    # Step 4: Build context with source tracking
+    retrieved = [chunks[i] for i in top_indices]
+    context_parts = []
+    all_sources = []
+    for chunk in retrieved:
+        meta = chunk.get("metadata", {})
+        source_label = ""
+        if meta.get("source") and meta.get("source") != "unknown":
+            source_label = f"[Source: {meta['source']}"
+            if meta.get("page"):
+                source_label += f", Page {meta['page']}"
+            source_label += "]"
+            loc = f" (p. {meta['page']})" if meta.get("page") else ""
+            all_sources.append(f"{meta['source']}{loc}")
+
+        if source_label:
+            context_parts.append(f"{source_label}\n{chunk['text']}")
+        else:
+            context_parts.append(chunk["text"])
+
+    context = "\n\n".join(context_parts)
+
+    # Step 5: Build prompt and generate
     prompt = _build_prompt(user_query, context)
 
-    # Choose LLM backend: Groq (cloud) if API key is set, else Ollama (local)
     if os.environ.get("GROQ_API_KEY"):
         answer = _generate_with_groq(prompt)
     else:
         answer = _generate_with_ollama(prompt)
 
-    # Ensure answer is a string and update history
     final_answer = str(answer) if answer is not None else "I'm sorry, I couldn't generate a response."
-    chat_history.append({"user": user_query, "assistant": final_answer})
 
+    # Append source references for transparency
+    unique_sources = list(dict.fromkeys(all_sources))  # preserve order, deduplicate
+    if unique_sources and len(final_answer) > 0:
+        final_answer += f"\n\n---\n*Sources: {', '.join(unique_sources)}*"
+
+    chat_history.append({"user": user_query, "assistant": final_answer})
     return final_answer
 
 
 def query_db(db_dir: str = "db") -> None:
-	"""Interactively prompt user for a question and print the response."""
-	question = input("Enter your question: ")
-	if not question.strip():
-		print("No question provided. Exiting.")
-		return
-	answer = get_response(question, db_dir=db_dir)
-	print("\n=== Answer ===\n")
-	print(answer)
+    """Interactively prompt user for a question and print the response."""
+    question = input("Enter your question: ")
+    if not question.strip():
+        print("No question provided. Exiting.")
+        return
+    answer = get_response(question, db_dir=db_dir)
+    print("\n=== Answer ===\n")
+    print(answer)
 
 
 if __name__ == "__main__":
-	query_db()
+    query_db()
