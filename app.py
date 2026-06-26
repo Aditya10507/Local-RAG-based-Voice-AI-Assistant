@@ -14,6 +14,23 @@ from flask import Flask, render_template, request, jsonify
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 
+
+def _load_env_file(path: str = ".env") -> None:
+    """Load simple KEY=VALUE pairs when python-dotenv is not installed."""
+    env_path = Path(path)
+    if not env_path.exists():
+        return
+
+    for line in env_path.read_text(encoding="utf-8-sig").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+_load_env_file()
+
 from ingest import ingest_pdf
 from query import get_response, chat_history, reset_rag_cache
 

@@ -14,6 +14,15 @@ except ImportError:
 
 if load_dotenv:
     load_dotenv()
+else:
+    env_path = Path(".env")
+    if env_path.exists():
+        for line in env_path.read_text(encoding="utf-8-sig").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 # In-memory conversation history. Each item is a dict: {"user": str, "assistant": str}
 # This is kept in memory only (no persistence) and will be included in prompts
