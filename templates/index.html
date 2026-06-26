@@ -4,487 +4,790 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Assistant</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231f2328'/%3E%3Ctext x='32' y='39' text-anchor='middle' font-size='22' font-family='Arial' font-weight='700' fill='white'%3EAI%3C/text%3E%3C/svg%3E">
   <style>
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    *, *::before, *::after { box-sizing: border-box; }
 
     :root {
-      --bg-primary: #212121;
-      --bg-secondary: #171717;
-      --bg-tertiary: #2f2f2f;
-      --bg-hover: #3a3a3a;
-      --text-primary: #ececec;
-      --text-secondary: #b4b4b4;
-      --text-muted: #8e8e8e;
-      --accent: #8e8cea;
-      --accent-hover: #a9a9f0;
-      --border: #424242;
-      --user-bubble: #2f2f2f;
-      --assistant-bubble: transparent;
-      --input-bg: #2f2f2f;
-      --input-border: #555;
-      --shadow: 0 2px 12px rgba(0,0,0,0.3);
-      --radius: 16px;
-      --radius-sm: 12px;
-      --transition: 0.2s ease;
+      --page: #f6f5f1;
+      --panel: #ffffff;
+      --panel-soft: #fbfaf7;
+      --text: #1f2328;
+      --text-soft: #5b616b;
+      --text-muted: #858b94;
+      --line: #dedbd2;
+      --line-strong: #cbc6ba;
+      --accent: #0f766e;
+      --accent-dark: #0b5f59;
+      --accent-soft: #e3f4f1;
+      --warn: #b45309;
+      --danger: #b42318;
+      --success: #15803d;
+      --shadow: 0 18px 45px rgba(31, 35, 40, 0.08);
+      --radius: 8px;
+      --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    html, body {
+      height: 100%;
     }
 
     body {
-      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
-      background: var(--bg-primary);
-      color: var(--text-primary);
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
+      margin: 0;
+      background: var(--page);
+      color: var(--text);
+      font-family: var(--font);
       overflow: hidden;
-      line-height: 1.6;
     }
 
-    /* ── Header ── */
-    .header {
+    button, textarea {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      height: 100vh;
+      min-height: 0;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      background: #ebe7dd;
+      border-right: 1px solid var(--line);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 18px 14px;
+      border-bottom: 1px solid rgba(31, 35, 40, 0.08);
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: #1f2328;
+      color: #fff;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .brand-title {
+      font-weight: 700;
+      line-height: 1.1;
+    }
+
+    .brand-status {
+      margin-top: 3px;
+      color: var(--text-soft);
+      font-size: 12px;
+      line-height: 1.3;
+    }
+
+    .sidebar-actions {
+      display: grid;
+      gap: 8px;
+      padding: 14px;
+    }
+
+    .action-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 9px;
+      width: 100%;
+      min-height: 40px;
+      padding: 9px 11px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: var(--panel);
+      color: var(--text);
+      cursor: pointer;
+      transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+    }
+
+    .action-button:hover {
+      background: var(--panel-soft);
+      border-color: #aaa394;
+    }
+
+    .action-button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    .action-button.primary:hover {
+      background: var(--accent-dark);
+      border-color: var(--accent-dark);
+    }
+
+    .action-button:disabled,
+    .icon-button:disabled,
+    .send-button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    .icon {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 18px;
+    }
+
+    .sidebar-section {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      padding: 10px 14px 14px;
+      border-top: 1px solid rgba(31, 35, 40, 0.08);
+    }
+
+    .section-heading {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px 20px;
-      background: var(--bg-secondary);
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-      z-index: 10;
-    }
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .header-logo {
-      width: 32px;
-      height: 32px;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6, #a78bfa);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-      color: white;
-      font-weight: 700;
-      flex-shrink: 0;
-    }
-    .header-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--text-primary);
-    }
-    .header-subtitle {
+      min-height: 28px;
+      color: var(--text-soft);
       font-size: 12px;
-      color: var(--text-muted);
-    }
-    .header-actions {
-      display: flex;
-      gap: 8px;
-    }
-    .btn-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      border: none;
-      background: transparent;
-      color: var(--text-secondary);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all var(--transition);
-      font-size: 18px;
-    }
-    .btn-icon:hover {
-      background: var(--bg-hover);
-      color: var(--text-primary);
-    }
-
-    /* ── Chat Area ── */
-    .chat-container {
-      flex: 1;
-      overflow-y: auto;
-      scroll-behavior: smooth;
-    }
-    .chat-container::-webkit-scrollbar { width: 6px; }
-    .chat-container::-webkit-scrollbar-track { background: transparent; }
-    .chat-container::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
-    .chat-container::-webkit-scrollbar-thumb:hover { background: #777; }
-
-    .chat-messages {
-      max-width: 768px;
-      margin: 0 auto;
-      padding: 20px 24px 120px;
-    }
-
-    /* ── Welcome screen ── */
-    .welcome {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 60vh;
-      text-align: center;
-      animation: fadeIn 0.5s ease;
-    }
-    .welcome-icon {
-      width: 64px;
-      height: 64px;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6, #a78bfa);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 28px;
-      color: white;
-      margin-bottom: 20px;
-      box-shadow: 0 4px 24px rgba(99, 102, 241, 0.3);
-    }
-    .welcome h2 {
-      font-size: 24px;
-      font-weight: 600;
-      margin-bottom: 8px;
-      color: var(--text-primary);
-    }
-    .welcome p {
-      font-size: 15px;
-      color: var(--text-muted);
-      max-width: 460px;
-      margin-bottom: 32px;
-    }
-    .suggestions {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      max-width: 520px;
-      width: 100%;
-    }
-    .suggestion-chip {
-      padding: 12px 16px;
-      background: var(--bg-tertiary);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      color: var(--text-secondary);
-      font-size: 13px;
-      cursor: pointer;
-      transition: all var(--transition);
-      text-align: left;
-      line-height: 1.4;
-    }
-    .suggestion-chip:hover {
-      background: var(--bg-hover);
-      border-color: var(--accent);
-      color: var(--text-primary);
-    }
-
-    /* ── Messages ── */
-    .message {
-      display: flex;
-      gap: 16px;
-      margin-bottom: 24px;
-      animation: slideUp 0.3s ease;
-    }
-    .message-avatar {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
       font-weight: 700;
-      flex-shrink: 0;
-      margin-top: 2px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
     }
-    .message.user .message-avatar {
-      background: #3b3b3b;
-      color: var(--text-secondary);
+
+    .documents {
+      display: grid;
+      gap: 7px;
+      min-height: 0;
+      overflow-y: auto;
+      padding-top: 8px;
     }
-    .message.assistant .message-avatar {
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
-      color: white;
+
+    .document-row {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr);
+      gap: 9px;
+      align-items: center;
+      padding: 9px;
+      border: 1px solid rgba(31, 35, 40, 0.08);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.52);
     }
-    .message-content {
-      flex: 1;
+
+    .document-icon {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 32px;
+      border-radius: 6px;
+      background: #fff7ed;
+      color: var(--warn);
+    }
+
+    .document-name {
+      overflow: hidden;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .document-size {
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .empty-documents {
+      padding: 12px 4px;
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .system-panel {
+      margin-top: auto;
+      padding: 14px;
+      border-top: 1px solid rgba(31, 35, 40, 0.08);
+    }
+
+    .status-grid {
+      display: grid;
+      gap: 7px;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 9px;
+      border: 1px solid rgba(31, 35, 40, 0.08);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.48);
+      color: var(--text-soft);
+      font-size: 12px;
+    }
+
+    .status-value {
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .chat-area {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      min-width: 0;
+      min-height: 0;
+      background: var(--panel);
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 66px;
+      padding: 13px 22px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.9);
+    }
+
+    .conversation-title {
       min-width: 0;
     }
-    .message-role {
+
+    .conversation-title h1 {
+      margin: 0;
+      font-size: 17px;
+      line-height: 1.25;
+    }
+
+    .conversation-title p {
+      margin: 3px 0 0;
+      color: var(--text-soft);
       font-size: 13px;
-      font-weight: 600;
-      margin-bottom: 4px;
-      color: var(--text-primary);
     }
-    .message-text {
-      font-size: 15px;
-      color: var(--text-primary);
-      white-space: pre-wrap;
-      word-wrap: break-word;
+
+    .topbar-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
     }
-    .message-text p { margin-bottom: 10px; }
-    .message-text p:last-child { margin-bottom: 0; }
-    .message-text code {
-      background: #1a1a2e;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-      font-size: 13px;
-      color: #c9d1d9;
+
+    .icon-button {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      color: var(--text-soft);
+      cursor: pointer;
+      transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
     }
-    .message-text pre {
-      background: #1a1a2e;
-      border: 1px solid var(--border);
+
+    .icon-button:hover {
+      background: var(--panel-soft);
+      border-color: var(--line-strong);
+      color: var(--text);
+    }
+
+    .chat-container {
+      min-height: 0;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+      background:
+        linear-gradient(to bottom, rgba(246, 245, 241, 0.54), rgba(255, 255, 255, 0) 180px),
+        var(--panel);
+    }
+
+    .chat-container::-webkit-scrollbar,
+    .documents::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .chat-container::-webkit-scrollbar-thumb,
+    .documents::-webkit-scrollbar-thumb {
+      background: #d2cdc2;
+      border-radius: 999px;
+    }
+
+    .chat-messages {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      width: min(860px, 100%);
+      margin: 0 auto;
+      padding: 34px 24px 32px;
+    }
+
+    .welcome {
+      display: grid;
+      align-content: center;
+      min-height: 54vh;
+    }
+
+    .welcome-inner {
+      max-width: 680px;
+    }
+
+    .welcome h2 {
+      margin: 0 0 12px;
+      font-size: clamp(30px, 5vw, 52px);
+      font-weight: 750;
+      line-height: 1.04;
+      letter-spacing: 0;
+    }
+
+    .welcome p {
+      margin: 0;
+      max-width: 580px;
+      color: var(--text-soft);
+      font-size: 16px;
+      line-height: 1.55;
+    }
+
+    .suggestions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    .suggestion-chip {
+      min-height: 52px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel-soft);
+      color: var(--text);
+      cursor: pointer;
+      line-height: 1.35;
+      text-align: left;
+      transition: background 160ms ease, border-color 160ms ease;
+    }
+
+    .suggestion-chip:hover {
+      background: #f1eee7;
+      border-color: var(--line-strong);
+    }
+
+    .message {
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr);
+      gap: 12px;
+      animation: slideUp 220ms ease;
+    }
+
+    .message.user {
+      grid-template-columns: minmax(0, 1fr) 34px;
+    }
+
+    .message-avatar {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
       border-radius: 8px;
-      padding: 14px 16px;
-      overflow-x: auto;
-      margin: 10px 0;
-    }
-    .message-text pre code {
-      background: none;
-      padding: 0;
+      background: #ede9df;
+      color: var(--text);
       font-size: 13px;
+      font-weight: 800;
+    }
+
+    .message.assistant .message-avatar {
+      background: var(--accent-soft);
+      color: var(--accent-dark);
+    }
+
+    .message.user .message-avatar {
+      grid-column: 2;
+      background: #1f2328;
+      color: #fff;
+    }
+
+    .message.user .message-content {
+      grid-column: 1;
+      grid-row: 1;
+      justify-self: end;
+      max-width: min(680px, 100%);
+    }
+
+    .message-content {
+      min-width: 0;
+    }
+
+    .message-role {
+      margin-bottom: 5px;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .message.user .message-role {
+      text-align: right;
+    }
+
+    .message-text {
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.65;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+
+    .message.user .message-text {
+      padding: 11px 13px;
+      border-radius: var(--radius);
+      background: #f1eee7;
       line-height: 1.5;
     }
-    .message-text ul, .message-text ol {
-      padding-left: 20px;
-      margin: 8px 0;
+
+    .message-text code {
+      padding: 2px 5px;
+      border-radius: 5px;
+      background: #f0f1f2;
+      color: #24292f;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 13px;
     }
-    .message-text li { margin-bottom: 4px; }
-    .message-text strong { color: #e2e8f0; }
-    .message-text em { color: var(--accent-hover); }
+
+    .message-text pre {
+      margin: 12px 0;
+      padding: 14px;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #f6f8fa;
+    }
+
+    .message-text pre code {
+      padding: 0;
+      background: transparent;
+    }
+
+    .message-text ul,
+    .message-text ol {
+      margin: 8px 0;
+      padding-left: 22px;
+    }
 
     .message-actions {
       display: flex;
-      gap: 4px;
+      gap: 6px;
       margin-top: 8px;
       opacity: 0;
-      transition: opacity var(--transition);
-    }
-    .message:hover .message-actions { opacity: 1; }
-    .msg-btn {
-      padding: 4px 10px;
-      border-radius: 6px;
-      border: none;
-      background: transparent;
-      color: var(--text-muted);
-      font-size: 12px;
-      cursor: pointer;
-      transition: all var(--transition);
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .msg-btn:hover {
-      background: var(--bg-hover);
-      color: var(--text-primary);
+      transition: opacity 160ms ease;
     }
 
-    /* ── Typing indicator ── */
-    .typing-indicator {
-      display: flex;
-      gap: 4px;
-      padding: 4px 0;
+    .message:hover .message-actions {
+      opacity: 1;
     }
+
+    .message.user .message-actions {
+      justify-content: flex-end;
+    }
+
+    .msg-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 8px;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .msg-btn:hover {
+      background: var(--panel-soft);
+      color: var(--text);
+    }
+
+    .typing-indicator {
+      display: inline-flex;
+      gap: 5px;
+      padding-top: 6px;
+    }
+
     .typing-indicator span {
       width: 6px;
       height: 6px;
+      border-radius: 999px;
       background: var(--text-muted);
-      border-radius: 50%;
-      animation: bounce 1.4s infinite ease-in-out;
+      animation: bounce 1.2s infinite ease-in-out;
     }
-    .typing-indicator span:nth-child(2) { animation-delay: 0.16s; }
-    .typing-indicator span:nth-child(3) { animation-delay: 0.32s; }
 
-    /* ── Input Area ── */
-    .input-area {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: linear-gradient(to top, var(--bg-primary) 80%, transparent);
-      padding: 20px 24px 24px;
-      z-index: 20;
+    .typing-indicator span:nth-child(2) { animation-delay: 0.14s; }
+    .typing-indicator span:nth-child(3) { animation-delay: 0.28s; }
+
+    .composer-wrap {
+      padding: 14px 22px 20px;
+      border-top: 1px solid var(--line);
+      background: linear-gradient(to top, #ffffff 80%, rgba(255, 255, 255, 0.78));
     }
-    .input-wrapper {
-      max-width: 768px;
-      margin: 0 auto;
-    }
-    .input-box {
+
+    .composer {
       display: flex;
       align-items: flex-end;
-      background: var(--input-bg);
-      border: 1px solid var(--input-border);
+      gap: 10px;
+      width: min(860px, 100%);
+      margin: 0 auto;
+      padding: 10px;
+      border: 1px solid var(--line-strong);
       border-radius: var(--radius);
-      padding: 10px 10px 10px 18px;
-      transition: border-color var(--transition), box-shadow var(--transition);
+      background: var(--panel);
+      box-shadow: var(--shadow);
     }
-    .input-box:focus-within {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 2px rgba(142, 140, 234, 0.15);
-    }
+
     #message-input {
       flex: 1;
-      background: none;
-      border: none;
-      outline: none;
-      color: var(--text-primary);
-      font-size: 15px;
-      font-family: inherit;
-      resize: none;
+      min-height: 38px;
       max-height: 150px;
-      line-height: 1.5;
-      padding: 4px 0;
+      padding: 8px 4px;
+      resize: none;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.45;
     }
-    #message-input::placeholder { color: var(--text-muted); }
-    .send-btn {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      border: none;
+
+    #message-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .send-button {
+      display: grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius);
       background: var(--accent);
       color: white;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all var(--transition);
-      flex-shrink: 0;
-      margin-left: 8px;
-    }
-    .send-btn:hover { background: var(--accent-hover); transform: scale(1.05); }
-    .send-btn:disabled {
-      background: var(--bg-hover);
-      color: var(--text-muted);
-      cursor: not-allowed;
-      transform: none;
-    }
-    .send-btn svg { width: 18px; height: 18px; }
-    .input-hint {
-      text-align: center;
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-top: 8px;
+      flex: 0 0 auto;
+      transition: background 160ms ease;
     }
 
-    /* ── Error toast ── */
-    .error-toast {
+    .send-button:hover {
+      background: var(--accent-dark);
+    }
+
+    .file-input-hidden {
+      display: none;
+    }
+
+    .toast {
       position: fixed;
-      bottom: 100px;
-      left: 50%;
-      transform: translateX(-50%) translateY(20px);
-      background: #dc2626;
+      right: 22px;
+      bottom: 22px;
+      z-index: 20;
+      max-width: min(460px, calc(100vw - 44px));
+      padding: 11px 13px;
+      border: 1px solid rgba(31, 35, 40, 0.12);
+      border-radius: var(--radius);
+      background: #1f2328;
       color: white;
-      padding: 10px 20px;
-      border-radius: 8px;
+      box-shadow: var(--shadow);
       font-size: 14px;
+      line-height: 1.4;
       opacity: 0;
-      transition: all 0.3s ease;
-      z-index: 100;
       pointer-events: none;
-      max-width: 500px;
-      text-align: center;
+      transform: translateY(10px);
+      transition: opacity 180ms ease, transform 180ms ease;
     }
-    .error-toast.show {
+
+    .toast.show {
       opacity: 1;
-      transform: translateX(-50%) translateY(0);
+      transform: translateY(0);
     }
 
-    /* ── Animations ── */
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
     @keyframes bounce {
-      0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
-      40% { transform: scale(1); opacity: 1; }
+      0%, 80%, 100% { transform: translateY(0); opacity: 0.45; }
+      40% { transform: translateY(-4px); opacity: 1; }
     }
 
-    /* ── Responsive ── */
+    @media (max-width: 900px) {
+      .app-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        display: none;
+      }
+    }
+
     @media (max-width: 640px) {
-      .chat-messages { padding: 16px 12px 100px; }
-      .suggestions { grid-template-columns: 1fr; }
-      .message { gap: 10px; }
-      .header { padding: 10px 14px; }
-      .input-area { padding: 14px 12px 18px; }
+      .topbar {
+        padding: 11px 12px;
+      }
+
+      .conversation-title p {
+        display: none;
+      }
+
+      .chat-messages {
+        padding: 24px 14px 26px;
+      }
+
+      .suggestions {
+        grid-template-columns: 1fr;
+      }
+
+      .composer-wrap {
+        padding: 10px 10px 14px;
+      }
     }
   </style>
 </head>
 <body>
-
-  <!-- Header -->
-  <div class="header">
-    <div class="header-left">
-      <div class="header-logo">AI</div>
-      <div>
-        <div class="header-title">AI Assistant</div>
-        <div class="header-subtitle">Local RAG-powered chat</div>
-      </div>
-    </div>
-    <div class="header-actions">
-      <button class="btn-icon" id="clear-btn" title="New chat">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-      </button>
-      <button class="btn-icon" id="health-btn" title="Check system status">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-      </button>
-    </div>
-  </div>
-
-  <!-- Chat Area -->
-  <div class="chat-container" id="chat-container">
-    <div class="chat-messages" id="chat-messages">
-      <!-- Welcome screen shown when no messages -->
-      <div class="welcome" id="welcome">
-        <div class="welcome-icon">AI</div>
-        <h2>How can I help you today?</h2>
-        <p>Ask me anything about your documents. I'll search through your knowledge base and provide relevant answers.</p>
-        <div class="suggestions">
-          <button class="suggestion-chip" onclick="sendSuggestion(this)">Summarize the key points from my documents</button>
-          <button class="suggestion-chip" onclick="sendSuggestion(this)">What are the main topics covered?</button>
-          <button class="suggestion-chip" onclick="sendSuggestion(this)">Find information about a specific topic</button>
-          <button class="suggestion-chip" onclick="sendSuggestion(this)">Compare different sections of the document</button>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">AI</div>
+        <div>
+          <div class="brand-title">RAG Assistant</div>
+          <div class="brand-status" id="document-status">Checking documents...</div>
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- Input Area -->
-  <div class="input-area">
-    <div class="input-wrapper">
-      <div class="input-box">
-        <textarea id="message-input" rows="1" placeholder="Message AI Assistant..." autofocus></textarea>
-        <button class="send-btn" id="send-btn" title="Send message" disabled>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      <div class="sidebar-actions">
+        <button class="action-button primary" id="upload-btn" title="Upload PDF documents">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+          Upload PDFs
+        </button>
+        <button class="action-button" id="reindex-btn" title="Rebuild search index">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15.5-6.2"/><path d="M18 2v4h-4"/><path d="M21 12a9 9 0 0 1-15.5 6.2"/><path d="M6 22v-4h4"/></svg>
+          Rebuild index
         </button>
       </div>
-      <div class="input-hint">AI searches your local documents to answer. Responses are generated locally via Ollama.</div>
-    </div>
+
+      <div class="sidebar-section">
+        <div class="section-heading">
+          <span>Documents</span>
+          <span id="document-count">0</span>
+        </div>
+        <div class="documents" id="document-list">
+          <div class="empty-documents">No PDFs uploaded.</div>
+        </div>
+      </div>
+
+      <div class="system-panel">
+        <div class="section-heading">System</div>
+        <div class="status-grid">
+          <div class="status-pill"><span>Index</span><span class="status-value" id="index-status">Checking</span></div>
+          <div class="status-pill"><span>Groq</span><span class="status-value" id="groq-status">Checking</span></div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="chat-area">
+      <header class="topbar">
+        <div class="conversation-title">
+          <h1>AI Assistant</h1>
+          <p id="top-status">Ask questions grounded in your indexed PDFs.</p>
+        </div>
+        <div class="topbar-actions">
+          <button class="icon-button" id="mobile-upload-btn" title="Upload PDF documents">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+          </button>
+          <button class="icon-button" id="mobile-reindex-btn" title="Rebuild search index">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15.5-6.2"/><path d="M18 2v4h-4"/><path d="M21 12a9 9 0 0 1-15.5 6.2"/><path d="M6 22v-4h4"/></svg>
+          </button>
+          <button class="icon-button" id="clear-btn" title="New chat">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          </button>
+          <button class="icon-button" id="health-btn" title="Check system status">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <input class="file-input-hidden" id="document-upload" type="file" accept="application/pdf,.pdf" multiple>
+
+      <section class="chat-container" id="chat-container">
+        <div class="chat-messages" id="chat-messages">
+          <div class="welcome" id="welcome">
+            <div class="welcome-inner">
+              <h2>What should we look up?</h2>
+              <p>Ask a focused question and I will answer from the documents in your index.</p>
+              <div class="suggestions">
+                <button class="suggestion-chip" onclick="sendSuggestion(this)">Summarize the indexed documents</button>
+                <button class="suggestion-chip" onclick="sendSuggestion(this)">What are the key obligations?</button>
+                <button class="suggestion-chip" onclick="sendSuggestion(this)">Find dates, names, and important terms</button>
+                <button class="suggestion-chip" onclick="sendSuggestion(this)">What should I pay attention to?</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="composer-wrap">
+        <div class="composer">
+          <textarea id="message-input" rows="1" placeholder="Message AI Assistant..."></textarea>
+          <button class="send-button" id="send-btn" title="Send message" disabled>
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="m22 2-7 20-4-9-9-4 20-7Z"/></svg>
+          </button>
+        </div>
+      </footer>
+    </main>
   </div>
 
-  <!-- Error Toast -->
-  <div class="error-toast" id="error-toast"></div>
+  <div class="toast" id="toast"></div>
 
   <script>
     const chatContainer = document.getElementById('chat-container');
     const chatMessages = document.getElementById('chat-messages');
-    const welcome = document.getElementById('welcome');
     const messageInput = document.getElementById('message-input');
     const sendBtn = document.getElementById('send-btn');
+    const uploadBtn = document.getElementById('upload-btn');
+    const mobileUploadBtn = document.getElementById('mobile-upload-btn');
+    const reindexBtn = document.getElementById('reindex-btn');
+    const mobileReindexBtn = document.getElementById('mobile-reindex-btn');
+    const documentUpload = document.getElementById('document-upload');
     const clearBtn = document.getElementById('clear-btn');
     const healthBtn = document.getElementById('health-btn');
-    const errorToast = document.getElementById('error-toast');
+    const toast = document.getElementById('toast');
+    const documentStatus = document.getElementById('document-status');
+    const documentCount = document.getElementById('document-count');
+    const documentList = document.getElementById('document-list');
+    const indexStatus = document.getElementById('index-status');
+    const groqStatus = document.getElementById('groq-status');
+    const topStatus = document.getElementById('top-status');
 
     let isLoading = false;
     let messageHistory = [];
 
-    // ── Auto-resize textarea ──
     messageInput.addEventListener('input', () => {
       messageInput.style.height = 'auto';
       messageInput.style.height = Math.min(messageInput.scrollHeight, 150) + 'px';
       sendBtn.disabled = !messageInput.value.trim();
     });
 
-    // ── Send on Enter (Shift+Enter for newline) ──
-    messageInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
+    messageInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
         if (!sendBtn.disabled && !isLoading) sendMessage();
       }
     });
@@ -495,74 +798,62 @@
 
     clearBtn.addEventListener('click', clearChat);
     healthBtn.addEventListener('click', checkHealth);
+    uploadBtn.addEventListener('click', () => documentUpload.click());
+    mobileUploadBtn.addEventListener('click', () => documentUpload.click());
+    reindexBtn.addEventListener('click', rebuildIndex);
+    mobileReindexBtn.addEventListener('click', rebuildIndex);
+    documentUpload.addEventListener('change', uploadDocuments);
 
-    // ── Send suggestion ──
-    function sendSuggestion(btn) {
-      messageInput.value = btn.textContent;
+    function setBusy(isBusy) {
+      uploadBtn.disabled = isBusy;
+      mobileUploadBtn.disabled = isBusy;
+      reindexBtn.disabled = isBusy;
+      mobileReindexBtn.disabled = isBusy;
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB'];
+      const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+      const value = bytes / Math.pow(1024, exponent);
+      return `${value.toFixed(value >= 10 || exponent === 0 ? 0 : 1)} ${units[exponent]}`;
+    }
+
+    function sendSuggestion(button) {
+      messageInput.value = button.textContent;
       messageInput.dispatchEvent(new Event('input'));
       sendMessage();
     }
 
-    // ── Show toast notification ──
-    function showToast(msg, type = 'error') {
-      errorToast.textContent = msg;
-      errorToast.style.background = type === 'success' ? '#16a34a' : '#dc2626';
-      errorToast.classList.add('show');
-      setTimeout(() => errorToast.classList.remove('show'), 5000);
+    function showToast(message, type = 'error') {
+      toast.textContent = message;
+      toast.style.background = type === 'success' ? '#14532d' : '#1f2328';
+      if (type === 'error') toast.style.background = '#7f1d1d';
+      toast.classList.add('show');
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove('show'), 5200);
     }
-    // Alias for backward compatibility
+
     const showError = showToast;
 
-    // ── Simple markdown-ish rendering (safe against XSS) ──
     function renderMarkdown(text) {
       if (!text) return '';
-      // First escape HTML to prevent XSS
       let html = text
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
-      // Then apply markdown transformations
+
       html = html
-        // Code blocks
         .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-        // Inline code
         .replace(/`([^`]+)`/g, '<code>$1</code>')
-        // Bold
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        // Italic
         .replace(/\*(.+?)\*/g, '<em>$1</em>')
-        // Unordered lists
         .replace(/^[\-\*] (.+)$/gm, '<li>$1</li>')
         .replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
-        // Ordered lists
         .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
-        // Line breaks
         .replace(/\n/g, '<br>');
+
       return html;
-    }
-
-    // ── Create message element ──
-    function createMessageElement(role, text) {
-      const div = document.createElement('div');
-      div.className = `message ${role}`;
-
-      const avatarLabel = role === 'user' ? 'You' : 'AI';
-      const roleName = role === 'user' ? 'You' : 'AI Assistant';
-
-      div.innerHTML = `
-        <div class="message-avatar">${avatarLabel.charAt(0)}</div>
-        <div class="message-content">
-          <div class="message-role">${roleName}</div>
-          <div class="message-text">${role === 'user' ? escapeHtml(text) : renderMarkdown(text)}</div>
-          <div class="message-actions">
-            <button class="msg-btn" onclick="copyMessage(this)" title="Copy">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-              Copy
-            </button>
-          </div>
-        </div>
-      `;
-      return div;
     }
 
     function escapeHtml(text) {
@@ -571,25 +862,47 @@
       return div.innerHTML;
     }
 
-    // ── Copy message ──
-    function copyMessage(btn) {
-      const text = btn.closest('.message-content').querySelector('.message-text').textContent;
-      navigator.clipboard.writeText(text);
-      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Copied!`;
-      setTimeout(() => {
-        btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy`;
-      }, 1500);
+    function createMessageElement(role, text) {
+      const div = document.createElement('div');
+      div.className = `message ${role}`;
+
+      const avatarLabel = role === 'user' ? 'Y' : 'AI';
+      const roleName = role === 'user' ? 'You' : 'Assistant';
+      const body = role === 'user' ? escapeHtml(text) : renderMarkdown(text);
+
+      div.innerHTML = `
+        <div class="message-avatar">${avatarLabel}</div>
+        <div class="message-content">
+          <div class="message-role">${roleName}</div>
+          <div class="message-text">${body}</div>
+          <div class="message-actions">
+            <button class="msg-btn" onclick="copyMessage(this)" title="Copy message">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+        </div>
+      `;
+      return div;
     }
 
-    // ── Show typing indicator ──
+    function copyMessage(button) {
+      const text = button.closest('.message-content').querySelector('.message-text').textContent;
+      navigator.clipboard.writeText(text);
+      button.textContent = 'Copied';
+      setTimeout(() => {
+        button.innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy';
+      }, 1400);
+    }
+
     function showTyping() {
       const div = document.createElement('div');
       div.className = 'message assistant';
       div.id = 'typing-msg';
       div.innerHTML = `
-        <div class="message-avatar">A</div>
+        <div class="message-avatar">AI</div>
         <div class="message-content">
-          <div class="message-role">AI Assistant</div>
+          <div class="message-role">Assistant</div>
           <div class="typing-indicator"><span></span><span></span><span></span></div>
         </div>
       `;
@@ -598,64 +911,158 @@
     }
 
     function hideTyping() {
-      const el = document.getElementById('typing-msg');
-      if (el) el.remove();
+      const element = document.getElementById('typing-msg');
+      if (element) element.remove();
     }
 
-    // ── Scroll to bottom ──
     function scrollToBottom() {
       chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
     }
 
-    // ── Send message ──
+    async function uploadDocuments() {
+      const files = Array.from(documentUpload.files || []);
+      if (!files.length) return;
+
+      const formData = new FormData();
+      files.forEach((file) => formData.append('documents', file));
+
+      setBusy(true);
+      showToast('Uploading PDF documents...', 'success');
+
+      try {
+        const response = await fetch('/api/upload', { method: 'POST', body: formData });
+        const data = await response.json();
+
+        if (!response.ok) {
+          showToast(data.error || 'Upload failed.');
+          return;
+        }
+
+        const uploadedCount = data.uploaded ? data.uploaded.length : files.length;
+        const rejectedCount = data.rejected ? data.rejected.length : 0;
+        const suffix = rejectedCount ? ` ${rejectedCount} file(s) were skipped.` : '';
+        showToast(`${uploadedCount} PDF file(s) uploaded. Rebuild the index before chatting with them.${suffix}`, 'success');
+        await refreshSystemState();
+      } catch (error) {
+        showToast('Upload failed. Is the server running?');
+      } finally {
+        setBusy(false);
+        documentUpload.value = '';
+      }
+    }
+
+    async function refreshDocuments() {
+      const response = await fetch('/api/documents');
+      const data = await response.json();
+      const documents = data.documents || [];
+
+      documentCount.textContent = documents.length;
+      documentStatus.textContent = documents.length === 1 ? '1 PDF uploaded' : `${documents.length} PDFs uploaded`;
+
+      if (!documents.length) {
+        documentList.innerHTML = '<div class="empty-documents">No PDFs uploaded.</div>';
+        return documents;
+      }
+
+      documentList.innerHTML = documents.map((document) => `
+        <div class="document-row" title="${escapeHtml(document.filename)}">
+          <div class="document-icon">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+          </div>
+          <div>
+            <div class="document-name">${escapeHtml(document.filename)}</div>
+            <div class="document-size">${formatBytes(document.size)}</div>
+          </div>
+        </div>
+      `).join('');
+
+      return documents;
+    }
+
+    async function refreshHealth() {
+      const response = await fetch('/api/health');
+      const data = await response.json();
+
+      indexStatus.textContent = data.index_ready ? 'Ready' : 'Missing';
+      indexStatus.style.color = data.index_ready ? 'var(--success)' : 'var(--warn)';
+      groqStatus.textContent = data.groq_configured ? 'Ready' : 'Missing';
+      groqStatus.style.color = data.groq_configured ? 'var(--success)' : 'var(--warn)';
+      topStatus.textContent = data.index_ready
+        ? `${data.uploaded_documents} PDF(s) indexed.`
+        : `${data.uploaded_documents} PDF(s) uploaded. Index rebuild needed.`;
+
+      return data;
+    }
+
+    async function refreshSystemState() {
+      try {
+        await Promise.all([refreshDocuments(), refreshHealth()]);
+      } catch (error) {
+        documentStatus.textContent = 'Status unavailable';
+        topStatus.textContent = 'Unable to reach the server.';
+      }
+    }
+
+    async function rebuildIndex() {
+      setBusy(true);
+      showToast('Rebuilding search index. This can take a minute...', 'success');
+
+      try {
+        const response = await fetch('/api/reindex', { method: 'POST' });
+        const data = await response.json();
+
+        if (!response.ok) {
+          showToast(data.error || 'Index rebuild failed.');
+          return;
+        }
+
+        showToast(`Index rebuilt from ${data.documents} PDF(s) with ${data.chunks} chunk(s).`, 'success');
+        await refreshSystemState();
+      } catch (error) {
+        showToast('Index rebuild failed. Is the server running?');
+      } finally {
+        setBusy(false);
+      }
+    }
+
     async function sendMessage() {
       const text = messageInput.value.trim();
       if (!text || isLoading) return;
 
-      // Hide welcome (re-query in case DOM was rebuilt after clear)
-      const welcomeEl = document.getElementById('welcome');
-      if (welcomeEl) welcomeEl.style.display = 'none';
+      const welcome = document.getElementById('welcome');
+      if (welcome) welcome.remove();
 
-      // Add user message
-      const userMsg = createMessageElement('user', text);
-      chatMessages.appendChild(userMsg);
+      chatMessages.appendChild(createMessageElement('user', text));
       messageHistory.push({ role: 'user', content: text });
 
-      // Clear input
       messageInput.value = '';
       messageInput.style.height = 'auto';
       sendBtn.disabled = true;
-
-      // Show typing
       isLoading = true;
       showTyping();
       scrollToBottom();
 
       try {
-        const res = await fetch('/api/chat', {
+        const response = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: text }),
         });
-
-        const data = await res.json();
+        const data = await response.json();
 
         hideTyping();
 
-        if (!res.ok) {
+        if (!response.ok) {
           showError(data.error || 'Something went wrong');
           return;
         }
 
-        // Add assistant message
-        const assistantMsg = createMessageElement('assistant', data.reply);
-        chatMessages.appendChild(assistantMsg);
+        chatMessages.appendChild(createMessageElement('assistant', data.reply));
         messageHistory.push({ role: 'assistant', content: data.reply });
         scrollToBottom();
-
-      } catch (err) {
+      } catch (error) {
         hideTyping();
-        showError('Failed to connect to the server. Is the app running?');
+        showError('Failed to connect to the server.');
       } finally {
         isLoading = false;
         sendBtn.disabled = !messageInput.value.trim();
@@ -663,48 +1070,47 @@
       }
     }
 
-    // ── Clear chat ──
     async function clearChat() {
       try {
         await fetch('/api/clear', { method: 'POST' });
-      } catch (e) { /* ignore */ }
+      } catch (error) {
+        /* keep local clear available */
+      }
 
-      chatMessages.innerHTML = '';
       messageHistory = [];
-
-      // Re-add welcome
       chatMessages.innerHTML = `
         <div class="welcome" id="welcome">
-          <div class="welcome-icon">AI</div>
-          <h2>How can I help you today?</h2>
-          <p>Ask me anything about your documents. I'll search through your knowledge base and provide relevant answers.</p>
-          <div class="suggestions">
-            <button class="suggestion-chip" onclick="sendSuggestion(this)">Summarize the key points from my documents</button>
-            <button class="suggestion-chip" onclick="sendSuggestion(this)">What are the main topics covered?</button>
-            <button class="suggestion-chip" onclick="sendSuggestion(this)">Find information about a specific topic</button>
-            <button class="suggestion-chip" onclick="sendSuggestion(this)">Compare different sections of the document</button>
+          <div class="welcome-inner">
+            <h2>What should we look up?</h2>
+            <p>Ask a focused question and I will answer from the documents in your index.</p>
+            <div class="suggestions">
+              <button class="suggestion-chip" onclick="sendSuggestion(this)">Summarize the indexed documents</button>
+              <button class="suggestion-chip" onclick="sendSuggestion(this)">What are the key obligations?</button>
+              <button class="suggestion-chip" onclick="sendSuggestion(this)">Find dates, names, and important terms</button>
+              <button class="suggestion-chip" onclick="sendSuggestion(this)">What should I pay attention to?</button>
+            </div>
           </div>
         </div>
       `;
       messageInput.focus();
     }
 
-    // ── Health check ──
     async function checkHealth() {
       try {
-        const res = await fetch('/api/health');
-        const data = await res.json();
-        if (data.index_ready) {
-          showToast('System healthy. Vector index is loaded and ready.', 'success');
+        const data = await refreshHealth();
+        if (data.index_ready && data.groq_configured) {
+          showToast(`System healthy. ${data.uploaded_documents} PDF(s) uploaded and Groq is configured.`, 'success');
+        } else if (!data.index_ready) {
+          showToast(`Index is not ready. Rebuild it after uploading PDFs.`);
         } else {
-          showToast('Warning: Vector index not found. Run `python ingest.py` first.');
+          showToast('GROQ_API_KEY is missing. Add it to your environment or .env file.');
         }
-      } catch (e) {
+      } catch (error) {
         showToast('Cannot reach the server.');
       }
     }
 
-    // ── Init ──
+    refreshSystemState();
     messageInput.focus();
   </script>
 </body>

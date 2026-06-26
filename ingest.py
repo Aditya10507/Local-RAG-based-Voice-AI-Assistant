@@ -1,9 +1,6 @@
 from pathlib import Path
 
 from pypdf import PdfReader
-from sentence_transformers import SentenceTransformer
-import faiss
-import numpy as np
 import json
 
 
@@ -116,14 +113,18 @@ def ingest_pdf(data_dir: str = "data", db_dir: str = "db") -> None:
 
     # 1) Find PDF files in the data directory
     data_path = Path(data_dir)
-    pdf_paths = list(data_path.glob("*.pdf"))
+    data_path.mkdir(parents=True, exist_ok=True)
+    pdf_paths = sorted(data_path.glob("*.pdf"))
     if not pdf_paths:
-        raise FileNotFoundError(f"No PDF files found in {data_dir}. Place a .pdf file there and retry.")
+        raise FileNotFoundError(
+            f"No PDF files found in {data_dir}. Upload PDFs from the web app "
+            "or place .pdf files in this folder, then run `python ingest.py` again."
+        )
 
     all_chunks = []
 
     for pdf_path in pdf_paths:
-        print(f"Loading PDF: {pdf_path}")
+        print(f"Loading PDF: {pdf_path}", flush=True)
 
         # 2) Read PDF text using pypdf, tracking page numbers
         reader = PdfReader(str(pdf_path))
@@ -143,9 +144,19 @@ def ingest_pdf(data_dir: str = "data", db_dir: str = "db") -> None:
                     }
                 })
 
-    print(f"Split into {len(all_chunks)} total chunks across {len(pdf_paths)} PDF(s)")
+    print(f"Split into {len(all_chunks)} total chunks across {len(pdf_paths)} PDF(s)", flush=True)
+    if not all_chunks:
+        raise RuntimeError(
+            "No readable text was extracted from the uploaded PDFs. Try PDFs with selectable text, "
+            "or add OCR support for scanned documents."
+        )
 
     # 4) Generate embeddings locally using sentence-transformers
+    print("Loading embedding model and generating vectors...", flush=True)
+    from sentence_transformers import SentenceTransformer
+    import faiss
+    import numpy as np
+
     st_model = SentenceTransformer("all-MiniLM-L6-v2")
     chunk_texts = [c["text"] for c in all_chunks]
     vectors = st_model.encode(chunk_texts, convert_to_numpy=True, show_progress_bar=True)
@@ -164,7 +175,7 @@ def ingest_pdf(data_dir: str = "data", db_dir: str = "db") -> None:
     with open(db_path / "chunks.json", "w", encoding="utf-8") as f:
         json.dump(all_chunks, f, ensure_ascii=False)
 
-    print(f"Saved FAISS index and {len(all_chunks)} chunks (with metadata) to {db_path}")
+    print(f"Saved FAISS index and {len(all_chunks)} chunks (with metadata) to {db_path}", flush=True)
 
 
 if __name__ == "__main__":

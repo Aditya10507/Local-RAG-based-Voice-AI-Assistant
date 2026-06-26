@@ -4,9 +4,16 @@ import os
 
 import faiss
 import numpy as np
-import requests
 from sentence_transformers import SentenceTransformer, CrossEncoder
 from rank_bm25 import BM25Okapi
+
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
+
+if load_dotenv:
+    load_dotenv()
 
 # In-memory conversation history. Each item is a dict: {"user": str, "assistant": str}
 # This is kept in memory only (no persistence) and will be included in prompts
@@ -29,6 +36,14 @@ _RRF_K = 60
 _DENSE_TOP_K = 20
 _SPARSE_TOP_K = 20
 _RRF_TOP_K = 15
+_DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
+
+
+def reset_rag_cache() -> None:
+    """Clear loaded index/retriever resources so the next query reloads rebuilt files."""
+    _GLOBAL["index"] = None
+    _GLOBAL["chunks"] = None
+    _GLOBAL["bm25"] = None
 
 
 def _tokenize(text: str) -> list[str]:
@@ -160,39 +175,26 @@ def _build_prompt(user_query: str, context: str) -> str:
 
 
 def _generate_with_groq(prompt: str) -> str:
-    """Generate a response using the Groq API (cloud LLM)."""
+    """Generate a response using the Groq API."""
+    api_key = os.environ.get("GROQ_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError(
+            "GROQ_API_KEY is not set. Add it to your environment or .env file "
+            "before starting the assistant."
+        )
+
+    model = os.environ.get("GROQ_MODEL", _DEFAULT_GROQ_MODEL).strip() or _DEFAULT_GROQ_MODEL
+
     from groq import Groq
-    client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+
+    client = Groq(api_key=api_key)
     completion = client.chat.completions.create(
-        model="mixtral-8x7b-32768",
+        model=model,
         messages=[{"role": "user", "content": prompt}],
         max_tokens=1024,
         temperature=0.7,
     )
     return completion.choices[0].message.content
-
-
-def _generate_with_ollama(prompt: str) -> str:
-    """Generate a response using local Ollama via its HTTP API.
-
-    The Ollama model can be configured via the OLLAMA_MODEL environment variable.
-    Defaults to 'mistral'.
-    """
-    model = os.environ.get("OLLAMA_MODEL", "mistral")
-    try:
-        resp = requests.post(
-            "http://localhost:11434/api/generate",
-            json={"model": model, "prompt": prompt, "stream": False},
-            timeout=120,
-        )
-        resp.raise_for_status()
-        return resp.json()["response"].strip()
-    except requests.exceptions.ConnectionError:
-        raise RuntimeError(
-            f"Cannot connect to Ollama at http://localhost:11434. "
-            f"Make sure Ollama is running and '{model}' model is pulled. "
-            "Alternatively, set the GROQ_API_KEY environment variable to use the Groq cloud API."
-        )
 
 
 def get_response(user_query: str, db_dir: str = "db", k: int = 5) -> str:
@@ -202,7 +204,7 @@ def get_response(user_query: str, db_dir: str = "db", k: int = 5) -> str:
     1. Hybrid retrieval (FAISS dense + BM25 sparse) with RRF fusion
     2. Cross-encoder re-ranking of top results
     3. Context assembly with source metadata
-    4. LLM generation via Ollama (local) or Groq (cloud)
+    4. LLM generation via the Groq API
 
     Returns the assistant's answer as a string and appends the interaction
     to the in-memory `chat_history`.
@@ -245,10 +247,7 @@ def get_response(user_query: str, db_dir: str = "db", k: int = 5) -> str:
     # Step 5: Build prompt and generate
     prompt = _build_prompt(user_query, context)
 
-    if os.environ.get("GROQ_API_KEY"):
-        answer = _generate_with_groq(prompt)
-    else:
-        answer = _generate_with_ollama(prompt)
+    answer = _generate_with_groq(prompt)
 
     final_answer = str(answer) if answer is not None else "I'm sorry, I couldn't generate a response."
 
