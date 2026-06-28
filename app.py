@@ -210,7 +210,7 @@ def api_health():
         "index_ready": index_exists and chunks_exists,
         "uploaded_documents": pdf_count,
         "groq_configured": bool(os.environ.get("GROQ_API_KEY", "").strip()),
-        "groq_model": os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile"),
+        "groq_model": os.environ.get("GROQ_MODEL", "qwen/qwen3.6-27b"),
     })
 
 

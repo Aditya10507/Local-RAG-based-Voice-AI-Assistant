@@ -30,7 +30,7 @@ search, and generates answers through the Groq API.
 | Component | Technology |
 |---|---|
 | Language | Python |
-| LLM | Groq API, default `llama-3.3-70b-versatile` |
+| LLM | Groq API, default `qwen/qwen3.6-27b` |
 | Embeddings | Sentence Transformers (`all-MiniLM-L6-v2`) |
 | Sparse Retrieval | BM25 (`rank-bm25`) |
 | Dense Retrieval | FAISS |
@@ -100,7 +100,7 @@ Create a `.env` file from `.env.example` and add your Groq API key:
 
 ```bash
 GROQ_API_KEY=your-groq-api-key
-GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_MODEL=qwen/qwen3.6-27b
 PORT=7860
 ```
 
@@ -141,7 +141,7 @@ Then open `http://localhost:7860` in your browser.
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `GROQ_API_KEY` | Yes | none | Groq API key used for LLM generation |
-| `GROQ_MODEL` | No | `llama-3.3-70b-versatile` | Groq model ID |
+| `GROQ_MODEL` | No | `qwen/qwen3.6-27b` | Groq model ID |
 | `PORT` | No | `7860` | Flask server port |
 | `MAX_UPLOAD_MB` | No | `25` | Maximum PDF upload size in MB |
 

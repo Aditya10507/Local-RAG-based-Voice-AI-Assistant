@@ -1,6 +1,7 @@
 from pathlib import Path
 import json
 import os
+import re
 
 import faiss
 import numpy as np
@@ -45,7 +46,12 @@ _RRF_K = 60
 _DENSE_TOP_K = 20
 _SPARSE_TOP_K = 20
 _RRF_TOP_K = 15
-_DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
+_DEFAULT_GROQ_MODEL = "qwen/qwen3.6-27b"
+
+
+def _clean_model_answer(answer: str) -> str:
+    """Remove reasoning tags if a model returns them despite hidden reasoning settings."""
+    return re.sub(r"<think>.*?</think>", "", answer, flags=re.DOTALL).strip()
 
 
 def reset_rag_cache() -> None:
@@ -197,13 +203,29 @@ def _generate_with_groq(prompt: str) -> str:
     from groq import Groq
 
     client = Groq(api_key=api_key)
-    completion = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=1024,
-        temperature=0.7,
-    )
-    return completion.choices[0].message.content
+    request_kwargs = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 1024,
+        "temperature": 0.7,
+    }
+    if model.startswith("qwen/"):
+        request_kwargs["reasoning_format"] = "hidden"
+        request_kwargs["reasoning_effort"] = "none"
+
+    try:
+        completion = client.chat.completions.create(
+            **request_kwargs
+        )
+    except Exception as e:
+        error_text = str(e)
+        if "blocked at the project level" in error_text or "model_permission_blocked_project" in error_text:
+            raise RuntimeError(
+                f"Groq model '{model}' is blocked for this project. "
+                "Change GROQ_MODEL in .env to an enabled model, or enable the model in Groq project settings."
+            ) from e
+        raise
+    return _clean_model_answer(completion.choices[0].message.content)
 
 
 def get_response(user_query: str, db_dir: str = "db", k: int = 5) -> str:
